@@ -11,7 +11,8 @@ from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from modules.dns_recon import run_dns_recon
+from modules.dns_recon import run_dns_recon, save_scan_result
+from modules.tech_detect import analyze_url
 from utils import validate_domain
 from models import ScanResult
 
@@ -28,7 +29,12 @@ console = Console()
 def scan(
     target: str = typer.Argument(..., help="Domain to scan (e.g., example.com)"),
     output: str = typer.Option("output", "--output", "-o", help="Output directory for results"),
-    wordlist: Optional[str] = typer.Option(None, "--wordlist", "-w", help="Custom subdomain wordlist file")
+    wordlist: Optional[str] = typer.Option(None, "--wordlist", "-w", help="Custom subdomain wordlist file"),
+    detect_technologies: bool = typer.Option(
+        True,
+        "--tech-detect/--no-tech-detect",
+        help="Detect technologies on live hosts"
+    )
 ):
     if not validate_domain(target):
         console.print(f"[red]Error: '{target}' is not a valid domain[/red]")
@@ -45,7 +51,17 @@ def scan(
             raise typer.Exit(1)
     
     try:
-        result = run_dns_recon(target, output_dir=output, wordlist=custom_words)
+        result = run_dns_recon(
+            target,
+            output_dir=output,
+            wordlist=custom_words,
+            save_output=False
+        )
+        if detect_technologies:
+            result.technologies = [
+                analyze_url(host.url) for host in result.live_hosts
+            ]
+        save_scan_result(result, output)
         display_results(result)
     except KeyboardInterrupt:
         console.print("\n[yellow]Scan interrupted by user[/yellow]")
@@ -107,6 +123,31 @@ def display_results(result: ScanResult):
             )
         
         console.print(table)
+
+    if result.technologies:
+        table = Table(title="Detected Technologies")
+        table.add_column("URL", style="cyan")
+        table.add_column("Technology", style="magenta")
+        table.add_column("Category", style="green")
+        table.add_column("Confidence", style="yellow")
+        table.add_column("Evidence", style="dim")
+
+        for stack in result.technologies:
+            for technology in stack.detected:
+                table.add_row(
+                    stack.url,
+                    technology.name,
+                    technology.category,
+                    technology.confidence,
+                    "; ".join(technology.evidence)
+                )
+
+        if table.row_count:
+            console.print(table)
+        else:
+            console.print("[dim]No technology signatures matched the live hosts.[/dim]")
+    elif result.live_hosts:
+        console.print("[dim]Technology detection was disabled.[/dim]")
 
 
 @app.command()

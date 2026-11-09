@@ -4,6 +4,7 @@ import requests
 import dns.resolver
 import dns.zone
 import dns.query
+from datetime import datetime, timezone
 from typing import List, Set, Optional
 from urllib.parse import urlparse
 
@@ -225,8 +226,15 @@ def probe_hosts(hosts: List[str]) -> List[LiveHost]:
     return live_hosts
 
 
-def run_dns_recon(domain: str, output_dir: str = "output", 
-                  wordlist: List[str] = None) -> ScanResult:
+def save_scan_result(result: ScanResult, output_dir: str = "output") -> None:
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    filepath = f"{output_dir}/weblens_{result.target}_{timestamp}.json"
+    save_json(result, filepath)
+
+
+def run_dns_recon(domain: str, output_dir: str = "output",
+                  wordlist: List[str] = None,
+                  save_output: bool = True) -> ScanResult:
     
     print(f"\n{'='*50}")
     print(f"AppIntel : DNS Reconnaissance")
@@ -256,10 +264,8 @@ def run_dns_recon(domain: str, output_dir: str = "output",
         live_hosts=live_hosts
     )
     
-    from datetime import datetime
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    filepath = f"{output_dir}/weblens_{domain}_{timestamp}.json"
-    save_json(result, filepath)
+    if save_output:
+        save_scan_result(result, output_dir)
     
     print(f"\n{'='*50}")
     print(f"Scan Complete")

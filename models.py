@@ -21,9 +21,21 @@ class LiveHost(BaseModel):
     title: Optional[str] = None
     ip: Optional[str] = None
 
+class DetectedTechnology(BaseModel):
+    name: str
+    category: str
+    confidence: str = "medium"
+    evidence: List[str] = Field(default_factory=list)
+    icon: str = "🔧"
+
+class TechStack(BaseModel):
+    url: str
+    detected: List[DetectedTechnology] = Field(default_factory=list)
+
 class ScanResult(BaseModel):
     target: str
     scan_time: datetime = Field(default_factory=datetime.now)
-    subdomains: List[Subdomain] = []
+    subdomains: List[Subdomain] = Field(default_factory=list)
     dns_records: DNSRecords = Field(default_factory=DNSRecords)
-    live_hosts: List[LiveHost] = []
+    live_hosts: List[LiveHost] = Field(default_factory=list)
+    technologies: List[TechStack] = Field(default_factory=list)
